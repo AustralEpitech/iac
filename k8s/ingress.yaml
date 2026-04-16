@@ -1,0 +1,72 @@
+# ==============================================================================
+# KUBERNETES INGRESS - THE LOAD BALANCER
+# ==============================================================================
+# This file creates the EXTERNAL load balancer (the main goal of your project!)
+# Think of it as:
+# - The restaurant entrance visible from the street
+# - Routes customers (web traffic) from internet to the kitchen (service)
+# - Handles HTTPS certificates (security)
+# ==============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  # Name of the ingress
+  name: app-ingress
+
+  # Labels for organization
+  labels:
+    app: app
+    environment: dev
+
+  # ------------------------------------------------------------------------------
+  # ANNOTATIONS - Special instructions for Google Cloud Load Balancer
+  # ------------------------------------------------------------------------------
+  # These are the 3 required annotations your teacher mentioned
+  annotations:
+    # 1. Use the static IP we created in Terraform
+    # This ensures your IP address doesn't change
+    kubernetes.io/ingress.global-static-ip-name: "${google_compute_global_address.app_ip.name}" # 2. Use the managed SSL certificate we created in Terraform
+    # This enables HTTPS (the padlock icon)
+    networking.gke.io/managed-certificates: "app-ssl-cert"
+
+    # 3. Pre-shared certificate (alternative/additional way to specify SSL)
+    # Some GKE versions use this annotation
+    ingress.gcp.kubernetes.io/pre-shared-cert: "app-ssl-cert"
+
+    # Additional helpful annotations:
+
+    # Use Google Cloud Load Balancer (not nginx)
+    kubernetes.io/ingress.class: "gce"
+
+    # Global load balancer (not regional)
+    ingress.gcp.kubernetes.io/backend-config: "default"
+
+spec:
+  # ------------------------------------------------------------------------------
+  # Routing rules
+  # ------------------------------------------------------------------------------
+  rules:
+    # This rule says: "For this domain, route all traffic to app-service"
+    - host: api.iac-epitech.com # Your actual domain
+      http:
+        paths:
+          # Route all paths (/) to the service
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-service # Must match service.yaml name
+                port:
+                  number: 80 # Must match service port
+
+  # ------------------------------------------------------------------------------
+  # Default backend (optional but recommended)
+  # ------------------------------------------------------------------------------
+  # If no rules match, traffic goes here (like a 404 page)
+  # For now, we send everything to the same service
+  defaultBackend:
+    service:
+      name: app-service
+      port:
+        number: 80

@@ -1,0 +1,56 @@
+name: Build and Push Application Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - ".github/workflows/build-app-image.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**"
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.modified, 'Dockerfile')) || (github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'Dockerfile'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            app:
+              - 'app/**'
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-action-wif-pool/providers/github-oidc"
+          service_account: "github-action-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
+      - name: Check if image exists
+        id: check-image
+        run: |
+          IMAGE="europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/flask-app:latest"
+          if gcloud artifacts docker images describe $IMAGE --quiet 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and Push App Image
+        if: steps.check-image.outputs.exists != 'true' || steps.changes.outputs.app == 'true'
+        run: |
+          gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+          IMAGE="europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/flask-app:latest"
+          docker build -t $IMAGE -f app/Dockerfile app/
+          docker push $IMAGE
+          echo "✅ Application image built and pushed successfully!"

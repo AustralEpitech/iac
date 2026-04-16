@@ -1,0 +1,51 @@
+# ==============================================================================
+# KUBERNETES SERVICE
+# ==============================================================================
+# This file creates an internal "door" to reach your pods
+# Think of it as:
+# - The kitchen entrance where waiters pick up food
+# - Waiters (Ingress) don't need to know which chef made the food
+# - They just go to the kitchen door, and it routes to an available chef
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  # Name of the service (referenced by Ingress)
+  name: app-service
+
+  # Labels for organization
+  labels:
+    app: app
+    environment: dev
+
+spec:
+  # ------------------------------------------------------------------------------
+  # Service Type: ClusterIP (internal only)
+  # ------------------------------------------------------------------------------
+  # ClusterIP = Internal only, not accessible from internet
+  # The Ingress (load balancer) will be the public-facing component
+  type: ClusterIP
+
+  # ------------------------------------------------------------------------------
+  # Selector - which pods this service routes to
+  # ------------------------------------------------------------------------------
+  # Must match the labels in deployment.yaml
+  selector:
+    app: app
+
+  # ------------------------------------------------------------------------------
+  # Ports configuration
+  # ------------------------------------------------------------------------------
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80 # Port the service listens on (what Ingress connects to)
+      targetPort: 8080 # Port your Flask app listens on (inside pod)
+
+  # ------------------------------------------------------------------------------
+  # Session affinity (optional)
+  # ------------------------------------------------------------------------------
+  # None = requests can go to any pod (default, best for load balancing)
+  # ClientIP = same client always goes to same pod (sticky sessions)
+  sessionAffinity: None

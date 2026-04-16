@@ -1,0 +1,151 @@
+# ==============================================================================
+# KUBERNETES DEPLOYMENT
+# ==============================================================================
+# This file tells Kubernetes HOW to run your application
+# Think of it as:
+# - Hiring instructions for chefs in the restaurant
+# - How many chefs to hire, what recipe book to use, what ingredients they need
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Name of this deployment
+  name: app-deployment
+
+  # Labels for organization (you can filter/search by these)
+  labels:
+    app: app
+    environment: dev
+    managed-by: terraform
+
+spec:
+  # ------------------------------------------------------------------------------
+  # How many copies (pods) to run initially
+  # ------------------------------------------------------------------------------
+  # HPA (HorizontalPodAutoscaler) will change this number automatically
+  replicas: 2 # Start with 2 copies for redundancy
+
+  # ------------------------------------------------------------------------------
+  # Selector - which pods this deployment manages
+  # ------------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: app
+
+  # ------------------------------------------------------------------------------
+  # Template - the blueprint for each pod
+  # ------------------------------------------------------------------------------
+  template:
+    metadata:
+      labels:
+        app: app
+
+    spec:
+      # --------------------------------------------------------------------------
+      # Containers - the actual application
+      # --------------------------------------------------------------------------
+      containers:
+        - name: app
+
+          # IMPORTANT: Update this image path after you push to Artifact Registry
+          # Format: REGION-docker.pkg.dev/PROJECT_ID/REPO_NAME/IMAGE_NAME:TAG
+          # Example: europe-west1-docker.pkg.dev/iac-epitech-dev/perth-app-repo/app:v1.0
+          image: europe-west1-docker.pkg.dev/iac-epitech-dev/perth-app-repo/app:latest
+
+          # Pull policy - always pull latest image
+          imagePullPolicy: Always
+
+          # Ports this container exposes
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+
+          # ------------------------------------------------------------------------
+          # Environment variables (secrets and config)
+          # ------------------------------------------------------------------------
+          env:
+            # JWT secret from Secret Manager
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets # Kubernetes secret (you'll create this)
+                  key: jwt_secret
+
+            # Database connection string from Secret Manager
+            - name: DB_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db_connection_string
+
+            # Flask configuration
+            - name: FLASK_ENV
+              value: "production"
+
+            - name: PORT
+              value: "8080"
+
+          # ------------------------------------------------------------------------
+          # Resource requests and limits
+          # ------------------------------------------------------------------------
+          # VERY IMPORTANT: These are used by HPA to calculate when to scale
+          resources:
+            # Requests = guaranteed resources (minimum needed)
+            requests:
+              cpu: 100m # 0.1 CPU cores (100 millicores)
+              memory: 128Mi # 128 megabytes RAM
+
+            # Limits = maximum resources (prevents one pod from hogging everything)
+            limits:
+              cpu: 500m # 0.5 CPU cores maximum
+              memory: 256Mi # 256 megabytes maximum
+
+          # ------------------------------------------------------------------------
+          # Health checks (probes)
+          # ------------------------------------------------------------------------
+          # Liveness probe - "Is the app still alive?"
+          # If this fails, Kubernetes restarts the pod
+          livenessProbe:
+            httpGet:
+              path: /health # Your health check endpoint
+              port: 8080
+            initialDelaySeconds: 10 # Wait 10s after start before checking
+            periodSeconds: 10 # Check every 10 seconds
+            timeoutSeconds: 3 # Wait 3s for response
+            failureThreshold: 3 # Restart after 3 failed checks
+
+          # Readiness probe - "Is the app ready to receive traffic?"
+          # If this fails, Kubernetes stops sending traffic (but doesn't restart)
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5 # Start checking after 5s
+            periodSeconds: 5 # Check every 5 seconds
+            timeoutSeconds: 3
+            failureThreshold: 2 # Mark unready after 2 failures
+
+          # Startup probe - "Has the app finished starting?"
+          # Gives app time to start before liveness/readiness checks begin
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12 # Allow up to 60s to start (12 * 5s)
+
+      # --------------------------------------------------------------------------
+      # Pod-level configuration
+      # --------------------------------------------------------------------------
+      # Restart policy - always restart failed pods
+      restartPolicy: Always
+
+      # Security context - run as non-root
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
