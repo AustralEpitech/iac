@@ -1,0 +1,26 @@
+# Terraform files
+*.tf
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Build scripts
+build-and-push.sh
+
+# Config files
+backends/
+vars/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Misc
+values.yaml
+

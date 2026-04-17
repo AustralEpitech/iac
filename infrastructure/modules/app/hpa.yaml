@@ -1,0 +1,92 @@
+# ==============================================================================
+# HORIZONTAL POD AUTOSCALER (HPA)
+# ==============================================================================
+# This file creates the AUTOSCALER (another key requirement!)
+# Think of it as:
+# - The restaurant manager who hires/fires chefs based on how busy it is
+# - Watches CPU usage and automatically adds/removes pods
+# ==============================================================================
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  # Name of the autoscaler
+  name: app-hpa
+  namespace: app
+
+  # Labels for organization
+  labels:
+    app: app
+    environment: dev
+
+spec:
+  # ------------------------------------------------------------------------------
+  # Which deployment to scale
+  # ------------------------------------------------------------------------------
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: flask-app # Must match deployment.yaml name
+
+  # ------------------------------------------------------------------------------
+  # Minimum and maximum number of pods
+  # ------------------------------------------------------------------------------
+  minReplicas: 2 # Never go below 2 pods (redundancy + avoid cold start)
+  maxReplicas: 10 # Never go above 10 pods (cost control)
+
+  # ------------------------------------------------------------------------------
+  # Scaling metrics - WHEN to scale
+  # ------------------------------------------------------------------------------
+  metrics:
+    # Scale based on CPU usage
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70 # Target 70% CPU usage
+
+          # How this works:
+          # - If average CPU across all pods > 70% → Add more pods
+          # - If average CPU across all pods < 70% → Remove pods
+          # - Always stay between minReplicas (2) and maxReplicas (10)
+
+  # You can add more metrics (optional)
+  # - type: Resource
+  #   resource:
+  #     name: memory
+  #     target:
+  #       type: Utilization
+  #       averageUtilization: 80  # Target 80% memory usage
+
+  # ------------------------------------------------------------------------------
+  # Scaling behavior (fine-tuning)
+  # ------------------------------------------------------------------------------
+  behavior:
+    # Scale UP behavior (adding pods)
+    scaleUp:
+      stabilizationWindowSeconds: 0 # Scale up immediately (no delay)
+      policies:
+        - type: Percent
+          value: 100 # Can double the number of pods
+          periodSeconds: 15 # Every 15 seconds
+        - type: Pods
+          value: 2 # Or add 2 pods at a time
+          periodSeconds: 15 # Every 15 seconds
+      selectPolicy: Max # Use whichever policy adds more pods
+
+    # Scale DOWN behavior (removing pods)
+    scaleDown:
+      stabilizationWindowSeconds:
+        300 # Wait 5 minutes before scaling down
+        # (avoid flapping - up/down/up/down)
+      policies:
+        - type: Percent
+          value: 50 # Remove at most 50% of pods
+          periodSeconds: 15 # Every 15 seconds
+        - type: Pods
+          value: 1 # Or remove 1 pod at a time
+          periodSeconds: 15 # Every 15 seconds
+      selectPolicy:
+        Min # Use whichever policy removes fewer pods
+        # (more conservative)
