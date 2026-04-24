@@ -45,14 +45,6 @@ variable "db_pwd" {
   sensitive   = true
 }
 
-// 
-
-variable "github_config_url" {
-  type        = string
-  description = "URL of the repo or org: https://github.com/my-org/my-repo"
-}
-
-// //
 // APP SECRET //
 
 variable "jwt_secret" {
@@ -61,27 +53,7 @@ variable "jwt_secret" {
   sensitive   = true
 }
 
-variable "ssl_cert" {
-  type        = string
-  description = "ssl certificate"
-  sensitive   = true
-}
-variable "ssl_key" {
-  type        = string
-  description = "ssl certificate"
-  sensitive   = true
-}
-
-
-// REPO GITHUB
-
-variable "github_repo_token" {
-  type        = string
-  description = "github repo token"
-  sensitive   = true
-}
-
-// CLUSTER 
+// CLUSTER
 
 variable "cluster_name" {
   description = "Runner Kubernetes cluster"
@@ -101,11 +73,6 @@ variable "runner_pool_sa" {
 variable "runner_pool_sa_roles" {
   description = "Runner Pool Service Account Roles"
   type        = list(string)
-}
-
-variable "arc_runner_name" {
-  description = "Runner Kubernetes cluster"
-  type        = string
 }
 
 variable "deletion_protection" {

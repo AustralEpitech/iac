@@ -43,26 +43,6 @@ module "cluster" {
     google_project_service.networking_api,
     google_project_service.container_api,
     google_secret_manager_secret_version.jwt_secret,
-    google_secret_manager_secret_version.ssl_cert,
-    google_secret_manager_secret_version.ssl_key,
-    google_secret_manager_secret_version.github_repo_token
-  ]
-}
-
-module "runners" {
-  source = "./modules/runners"
-
-  project_id        = var.project_id
-  region            = var.region
-  zone              = var.zone
-  github_config_url = var.github_config_url
-  arc_runner_name   = var.arc_runner_name
-  runner_image_url  = "${var.region}-docker.pkg.dev/${var.project_id}/${data.google_artifact_registry_repository.runners.repository_id}/runner:latest"
-
-  depends_on = [
-    module.cluster,
-    data.google_artifact_registry_repository.runners,
-    google_secret_manager_secret_version.github_repo_token
   ]
 }
 
@@ -85,8 +65,6 @@ module "database" {
     google_project_service.networking_api,
     module.cluster,
     google_secret_manager_secret_version.jwt_secret,
-    google_secret_manager_secret_version.ssl_cert,
-    google_secret_manager_secret_version.ssl_key
   ]
 }
 
@@ -114,8 +92,6 @@ module "app" {
     data.google_artifact_registry_repository.app,
     google_compute_global_address.app_ip,
     google_secret_manager_secret_version.jwt_secret,
-    google_secret_manager_secret_version.ssl_cert,
-    google_secret_manager_secret_version.ssl_key,
     google_secret_manager_secret_version.db_connection
   ]
 }

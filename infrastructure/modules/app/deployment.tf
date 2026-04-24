@@ -211,27 +211,8 @@ resource "kubernetes_service_v1" "app" {
 }
 
 # ==============================================================================
-# FRONTEND CONFIG - HTTP to HTTPS redirect
-# ==============================================================================
-resource "kubernetes_manifest" "frontend_config" {
-  manifest = {
-    apiVersion = "networking.gke.io/v1beta1"
-    kind       = "FrontendConfig"
-    metadata = {
-      name      = "${var.app_name}-frontend-config"
-      namespace = kubernetes_namespace_v1.app.metadata[0].name
-    }
-    spec = {
-      redirectToHttps = {
-        enabled          = true
-        responseCodeName = "MOVED_PERMANENTLY_DEFAULT"
-      }
-    }
-  }
-}
-
-# ==============================================================================
-# INGRESS - Routes external traffic to your app
+# INGRESS - HTTP only (no domain, no SSL)
+# Routes external traffic to the app via GCE L7 Load Balancer
 # ==============================================================================
 resource "kubernetes_ingress_v1" "app" {
   metadata {
@@ -239,27 +220,13 @@ resource "kubernetes_ingress_v1" "app" {
     namespace = kubernetes_namespace_v1.app.metadata[0].name
 
     annotations = {
-      # Use the GCE Ingress controller (Google's L7 Load Balancer)
-      "kubernetes.io/ingress.class" = "gce"
-
-      # Use the static IP we reserved
+      "kubernetes.io/ingress.class"                 = "gce"
       "kubernetes.io/ingress.global-static-ip-name" = var.static_ip_name
-
-      # Use the managed SSL certificate
-      "networking.gke.io/managed-certificates" = var.ssl_cert_name
-
-      # Allow HTTP (will be redirected to HTTPS by FrontendConfig)
-      "kubernetes.io/ingress.allow-http" = "true"
-
-      # Use the FrontendConfig for HTTP->HTTPS redirect
-      "networking.gke.io/v1beta1.FrontendConfig" = "${var.app_name}-frontend-config"
+      "kubernetes.io/ingress.allow-http"            = "true"
     }
   }
 
-  depends_on = [kubernetes_manifest.frontend_config]
-
   spec {
-    # Default backend - all traffic goes to our app
     default_backend {
       service {
         name = kubernetes_service_v1.app.metadata[0].name
@@ -268,45 +235,34 @@ resource "kubernetes_ingress_v1" "app" {
         }
       }
     }
-
-    # Rule for your domain
-    rule {
-      host = var.domain_name
-
-      http {
-        path {
-          path      = "/*"
-          path_type = "ImplementationSpecific"
-
-          backend {
-            service {
-              name = kubernetes_service_v1.app.metadata[0].name
-              port {
-                number = 80
-              }
-            }
-          }
-        }
-      }
-    }
   }
 }
 
-resource "kubernetes_manifest" "app_hpa" {
-  manifest = yamldecode(file("${path.module}/hpa.yaml"))
-}
+resource "kubernetes_horizontal_pod_autoscaler_v2" "app" {
+  metadata {
+    name      = "${var.app_name}-hpa"
+    namespace = kubernetes_namespace_v1.app.metadata[0].name
+  }
 
-# Managed Certificate resource for GKE
-resource "kubernetes_manifest" "managed_certificate" {
-  manifest = {
-    apiVersion = "networking.gke.io/v1"
-    kind       = "ManagedCertificate"
-    metadata = {
-      name      = var.ssl_cert_name
-      namespace = kubernetes_namespace_v1.app.metadata[0].name
+  spec {
+    min_replicas = 2
+    max_replicas = 10
+
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = kubernetes_deployment_v1.app.metadata[0].name
     }
-    spec = {
-      domains = [var.domain_name]
+
+    metric {
+      type = "Resource"
+      resource {
+        name = "cpu"
+        target {
+          type                = "Utilization"
+          average_utilization = 70
+        }
+      }
     }
   }
 }
