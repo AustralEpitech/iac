@@ -11,9 +11,9 @@ cidr_block = "10.0.0.0/16"
 db_name = "appdb"
 
 // Cluster
-cluster_name         = "iac-dev-cluster"
-runner_pool_name     = "runner-pool"
-runner_pool_sa       = "gke-runner-sa"
+cluster_name     = "iac-dev-cluster"
+runner_pool_name = "runner-pool"
+runner_pool_sa   = "gke-runner-sa"
 runner_pool_sa_roles = [
   "roles/artifactregistry.reader",
   "roles/logging.logWriter",
